@@ -1,10 +1,14 @@
 # NextDose: your child's road to health, booked.
 
-![NextDose](logo.png)
+![NextDose](logo.png?v=1b907797)
 
-NextDose knows which vaccine your baby needs next and books the clinic visit for it.
+NextDose helps caregivers understand the next scheduled childhood immunisation visit and try a simulated clinic booking.
 
 The interface uses Inter with a teal, mint and navy palette, a schedule progress track, a next-dose card and selectable day and time chips. See the [design mockup](design-mockup.html).
+
+**Live prototype:** https://tibule12.github.io/NextDose/
+
+**Prototype note:** All clinic appointments are simulated. No real health service booking is made, and the vaccination information requires clinical verification before real-world use.
 
 ## The African problem
 

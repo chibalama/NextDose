@@ -74,11 +74,14 @@
     .confirmation h1 { margin-bottom: 1rem; }
     @media (max-width: 520px) { .row { grid-template-columns: 1fr; } .next-card { align-items: flex-start; } }
   </style>
+  <link rel="icon" type="image/png" href="logo.png?v=1b907797">
+  <link rel="apple-touch-icon" href="logo.png?v=1b907797">
+  <link rel="stylesheet" href="ndlela-ui.css?v=iphone-form-fix-1">
 </head>
 <body>
   <main>
     <header>
-      <div class="brand"><img src="logo.png" alt="NextDose logo"><h1><span>Next</span><span class="brand-dose">Dose</span></h1></div>
+      <div class="brand"><img src="logo.png?v=1b907797" alt="NextDose logo"><h1><span>Next</span><span class="brand-dose">Dose</span></h1></div>
       <p>Your child's road to health, booked.</p>
     </header>
     <section id="app"></section>
@@ -129,27 +132,30 @@
     const persist = () => localStorage.setItem(KEY, JSON.stringify(saved));
 
     function showStart(message = '') {
-      app.innerHTML = `<h1>Immunisation schedule</h1>
+      app.innerHTML = `<nav class="page-nav">${saved.dob ? '<button type="button" id="back-to-list" class="back-button">← Back to schedule</button>' : ''}</nav><h1>Immunisation schedule</h1>
         <form class="card" id="start">
           <label for="name">Child's name</label>
           <input id="name" name="name" type="text" value="${(saved.name || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}">
           <label for="dob">Date of birth</label>
-          <input id="dob" name="dob" type="date" max="${todayISO()}" value="${saved.dob || ''}">
+          <div class="dob-field"><input id="dob" name="dob" type="date" aria-describedby="dob-help" max="${todayISO()}" value="${saved.dob || ''}"></div>
+          <p class="dob-help" id="dob-help">Tap the field to choose a date.</p>
           <p class="error" role="alert">${message}</p>
           <button type="submit">Show schedule</button>
         </form>`;
+      window.scrollTo(0, 0);
+      app.querySelector('#back-to-list')?.addEventListener('click', showSchedule);
       app.querySelector('#start').addEventListener('submit', event => {
         event.preventDefault();
         const name = app.querySelector('#name').value.trim();
         const dob = app.querySelector('#dob').value;
         if (!dob || dob > todayISO()) return showStart(!dob ? 'Please enter a date of birth.' : 'Date of birth cannot be in the future.');
-        saved = { ...saved, name, dob, done: saved.done || [] };
+        saved = dob === saved.dob ? { ...saved, name, dob } : { name, dob, done: [], bookings: {} };
         persist();
         showSchedule();
       });
     }
 
-    function showSchedule() {
+    function showSchedule(scrollToTop = true) {
       const birth = parseDate(saved.dob);
       const today = parseDate(todayISO());
       const entries = SCHEDULE.map((item, index) => {
@@ -164,15 +170,14 @@
       });
       const bookIndex = entries.filter(row => !row.done && !row.booking && (row.status === 'overdue' || row.status === 'due'))
         .sort((a, b) => a.due - b.due)[0]?.index;
-      app.innerHTML = `<h1>${saved.name ? `${saved.name}'s schedule` : 'Immunisation schedule'}</h1>
+      app.innerHTML = `<nav class="page-nav"><button type="button" id="back-to-details" class="back-button">← Back to child details</button></nav><h1>${saved.name ? `${saved.name}'s schedule` : 'Immunisation schedule'}</h1>
         <p>Date of birth: ${formatDate(birth)}</p>
         ${bookIndex === undefined ? '' : `<article class="next-card">
-          <div class="next-card-copy"><span class="next-dot"></span><div><strong class="next-headline ${entries[bookIndex].status === 'overdue' ? 'overdue' : ''}">${entries[bookIndex].status === 'overdue' ? 'Overdue' : `Next dose in ${Math.round((entries[bookIndex].due - today) / 86400000)} days`}</strong>
+          <div><strong class="next-headline ${entries[bookIndex].status === 'overdue' ? 'overdue' : ''}">${entries[bookIndex].status === 'overdue' ? 'Overdue' : `Next vaccination in ${Math.round((entries[bookIndex].due - today) / 86400000)} days`}</strong>
             <p>${entries[bookIndex].item.label}</p></div>
-          </div>
           <a class="book-now" href="#booking" data-book="${bookIndex}">Book now ›</a>
         </article>`}
-        <div class="rows">${entries.map(({ item, index, due, status, done, booking }) => `
+        <div class="list-heading"><h2>Vaccination timeline</h2><span>${entries.filter(row => row.done).length} of ${entries.length} completed</span></div><div class="rows">${entries.map(({ item, index, due, status, done, booking }) => `
           <article class="row">
             <div><h2>${item.label}</h2><p class="vaccines">${item.vaccines.join(', ')}</p>
               <span class="status ${status}">${status === 'done' ? '✓ Done' : status === 'due' ? '⏰ Due soon' : status === 'overdue' ? '! Overdue' : '📅 Upcoming'}</span> <span>Due ${formatDate(due)}</span></div>
@@ -180,13 +185,15 @@
               ${booking ? `Booked: ${formatDate(parseDate(booking.date))}, ${booking.time}` : index === bookIndex ? `<button type="button" data-book="${index}">Book</button>` : ''}</div>
           </article>`).join('')}</div>
         <p><button id="edit" type="button">Edit details</button></p>`;
+      if (scrollToTop) window.scrollTo(0, 0);
+      app.querySelector('#back-to-details').addEventListener('click', () => showStart());
       app.querySelectorAll('[data-index]').forEach(box => box.addEventListener('change', () => {
         saved.done = saved.done || [];
         saved.done[box.dataset.index] = box.checked;
         persist();
-        showSchedule();
+        showSchedule(false);
       }));
-      app.querySelectorAll('[data-book]').forEach(button => button.addEventListener('click', () => showBooking(Number(button.dataset.book))));
+      app.querySelectorAll('[data-book]').forEach(button => button.addEventListener('click', event => { event.preventDefault(); showBooking(Number(button.dataset.book)); }));
       app.querySelector('#edit').addEventListener('click', () => showStart());
     }
 
@@ -198,22 +205,24 @@
         date.setDate(date.getDate() + 1);
         if (date.getDay() !== 0 && date.getDay() !== 6) weekdays.push(new Date(date));
       }
-      app.innerHTML = `<h1>Book ${visit.label}</h1>
+      app.innerHTML = `<nav class="page-nav"><button type="button" id="back-to-schedule" class="back-button">← Back to schedule</button></nav><h1>Book ${visit.label}</h1>
         <p>${visit.vaccines.join(', ')}</p>
         <form class="card booking-form" id="booking">
           <label for="clinic">Demo clinics</label>
           <select id="clinic" required><option value="">Choose a clinic</option>${CLINICS.map(clinic => `<option value="${clinic.name}">${clinic.name} (${clinic.area})</option>`).join('')}</select>
           <label for="date">Date</label>
-          <select id="date" class="chip-select" size="6" required><option value="">Choose a weekday</option>${weekdays.map(day => `<option value="${todayISOFor(day)}">${formatDate(day)}</option>`).join('')}</select>
+          <select id="date" class="chip-select" required><option value="">Choose a weekday</option>${weekdays.map(day => `<option value="${todayISOFor(day)}">${formatDate(day)}</option>`).join('')}</select>
           <label for="time">Time</label>
-          <select id="time" class="chip-select" size="5" required><option value="">Choose a time</option>${TIMES.map(time => `<option>${time}</option>`).join('')}</select>
-          <p class="error" role="alert"></p>
-          <button type="submit">Confirm</button>
+          <select id="time" class="chip-select" required><option value="">Choose a time</option>${TIMES.map(time => `<option>${time}</option>`).join('')}</select>
+          <p class="demo-note">Demo only — no real clinic appointment is reserved.</p><p class="error" role="alert"></p>
+          <button type="submit">Save demo booking</button>
         </form>`;
+      window.scrollTo(0, 0);
+      app.querySelector('#back-to-schedule').addEventListener('click', showSchedule);
       app.querySelector('#booking').addEventListener('submit', event => {
         event.preventDefault();
         const booking = {
-          ref: `NDL-${Math.floor(1000 + Math.random() * 9000)}`,
+          ref: `NXT-${Math.floor(1000 + Math.random() * 9000)}`,
           clinic: app.querySelector('#clinic').value,
           date: app.querySelector('#date').value,
           time: app.querySelector('#time').value,
@@ -232,12 +241,13 @@
       const visit = SCHEDULE.find(item => item.label === booking.label);
       app.innerHTML = `<section class="card confirmation">
         <div class="confirmation-mark" aria-hidden="true">✓</div>
-        <h1>You're booked</h1><p><strong>${saved.name || 'Child'}</strong></p>
+        <h1>Demo booking saved</h1><p class="demo-note">This is a simulated booking, not a real clinic appointment.</p><p><strong>${saved.name || 'Child'}</strong></p>
           <p>${visit.vaccines.join(', ')}</p><p>${booking.clinic}</p>
           <p>${formatDate(parseDate(booking.date))} at ${booking.time}</p>
           <p>Reference: <strong>${booking.ref}</strong></p>
           <button id="back" type="button">Back to schedule</button>
         </section>`;
+      window.scrollTo(0, 0);
       app.querySelector('#back').addEventListener('click', showSchedule);
     }
 
